@@ -103,6 +103,10 @@ slurmdrmaa_session_run_bulk(
 
     /* zero out the struct, and set default vaules */
 	slurm_init_job_desc_msg( &job_desc );
+
+// XXXX: job_desc has job parameters and such (see slurm.h)
+// XXXX: job_desc.num_tasks = 0;
+// XXXX: job_desc.pn_min_memory = 1024;
 	
 	TRY
 	 {
@@ -133,10 +137,30 @@ slurmdrmaa_session_run_bulk(
 		else
 			fsd_log_debug(("job %u submitted on cluster %s", submit_response->job_id, working_cluster_rec->name));
 
+
 		if ( start != 0 || end != 0 || incr != 0 ) {
-			if ( SLURM_SUCCESS == slurm_load_job( &job_info, submit_response->job_id, 0) )
-			{
-				fsd_assert(  job_info->record_count == n_jobs );
+			if ( SLURM_SUCCESS == slurm_load_job( &job_info, submit_response->job_id, SHOW_ALL) ) {
+
+				// XXXX: job_info->record_count == 1 until tasks are scheduled; i.e. if the
+				// XXXX: resources for the job are not available, the jobs will be in PD (PENDING)
+				// XXXX: state and the 0 < job_info->record_count < n_jobs.
+
+				unsigned int time_to_sleep = 1;
+				do {
+					if ( SLURM_SUCCESS != slurm_load_job( &job_info, submit_response->job_id, SHOW_ALL) ) {
+						fsd_exc_raise_fmt( FSD_ERRNO_INTERNAL_ERROR,"slurm_load_job: %s",slurm_strerror(slurm_get_errno()));
+					}
+					if (job_info->record_count != n_jobs) {
+						sleep(time_to_sleep);
+					}
+					time_to_sleep++; // back off gradually...
+					if (time_to_sleep > 10) {
+						fsd_exc_raise_fmt(FSD_ERRNO_INTERNAL_ERROR,"time out");
+					}
+				} while (job_info->record_count != n_jobs);
+
+				// fsd_assert(  job_info->record_count == n_jobs );
+
 				for(i=0; i < job_info->record_count; i++)
 				{
 					if (!working_cluster_rec)

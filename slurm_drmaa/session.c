@@ -117,6 +117,8 @@ slurmdrmaa_session_run_bulk(
             n_jobs = 1;
          }
 
+
+	// XXXX: rework this part; look at https://github.com/SchedMD/slurm/blob/master/src/sbatch/sbatch.c#L245
         fsd_calloc( job_ids, n_jobs+1, char* );
 
 		if ( start != 0 || end != 0 || incr != 0 ) {
